@@ -6,6 +6,9 @@ import os
 import pandas as pd
 import numpy as np
 import tifffile as tiff
+from tqdm.auto import tqdm
+from itertools import product
+
 
 class HtImageFormatter:
     def __init__(self):
@@ -88,23 +91,25 @@ class HtImageFormatter:
 
         final_img = np.zeros((y, x, len(channels), len(z_indices), len(times)), dtype=first_img.dtype)
 
-        for channel in channels:
-            if channel == 0:
-                continue
-            for zstep in z_indices:
-                for time in times:
-                    row = grp[
-                        (grp["channel_number"] == channel) &
-                        (grp["z-index"] == zstep) &
-                        (grp["time"] == time)
-                    ]
-                    img = tiff.imread(row["image_paths"].values[0])  # (Y, X)
-                    final_img[:, :,
-                                c_to_idx[row["channel_number"].values[0]],
-                                z_to_idx[row["z-index"].values[0]],
-                                t_to_idx[row["time"].values[0]]
-                            ] = img
-        final_img = np.squeeze(final_img) 
+        channels_nz = [c for c in channels if c != 0] # Exclude the empty channel (0) from the loop.
+        total_iters = len(channels_nz) * len(z_indices) * len(times)
+
+        with tqdm(total=total_iters, desc="Building image...", unit="img") as pbar:
+            for channel, zstep, time in product(channels_nz, z_indices, times):
+                row = grp[
+                    (grp["channel_number"] == channel) &
+                    (grp["z-index"] == zstep) &
+                    (grp["time"] == time)
+                ]
+                img = tiff.imread(row["image_paths"].values[0])  # (Y, X)
+
+                final_img[:, :,
+                        c_to_idx[row["channel_number"].values[0]],
+                        z_to_idx[row["z-index"].values[0]],
+                        t_to_idx[row["time"].values[0]]] = img
+
+                pbar.update(1)
+
         final_img = np.squeeze(final_img)  # Remove singleton dimensions if any
         
         return [final_img, first_img.dtype]
