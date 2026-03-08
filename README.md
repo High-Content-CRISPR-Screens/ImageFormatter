@@ -38,18 +38,19 @@ pip install numpy pandas tifffile tqdm
 
 ```bash
 conda env create -f environment.yml
-conda activate imageformater
 ```
 
 ## Usage
 
-### 1. Activate the environment
+### 1. Activate the environment from the directory containing the code
 
 ```bash
 conda activate imageformater
 ```
 
-### 2. Run the ScanR formater script
+### 2. Run the relevant formater script
+
+For ScanR images:
 
 ```bash
 python main_scanr.py
@@ -58,6 +59,8 @@ python main_scanr.py
 The script will ask for the path to your ScanR acquisition directory and then export reconstructed TIFF images.
 
 ## Programmatic usage example
+
+You may also use the module as part of a larger application.
 
 ```python
 from HtImageformater import HtImageformater
