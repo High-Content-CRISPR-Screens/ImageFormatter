@@ -2,3 +2,5 @@ numpy
 pandas
 tifffile
 tqdm
+imagecodecs
+ipywidgets
