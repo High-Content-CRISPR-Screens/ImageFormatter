@@ -11,6 +11,11 @@ Use one of the official installers, e.g.:
 - Miniconda: https://www.anaconda.com/docs/getting-started/miniconda/main
 - Conda-Forge (Miniforge): https://conda-forge.org/download/
 
+### 2. Download the code
+
+You can download the code as a zip and simply unzip it somewhere in your computer.
+Alternatively, you can clone the repository. If you're not confortable with git, we recommend GitHub Desktop to manage your repositories. 
+
 ### 2. Create and activate a Conda environment
 
 From a terminal in this project folder:
@@ -42,7 +47,7 @@ conda env create -f environment.yml
 
 ## Usage
 
-### 1. Activate the environment from the directory containing the code
+### 1. Activate the environment from the project directory
 
 ```bash
 conda activate imageformater
@@ -56,7 +61,7 @@ For ScanR images:
 python main_scanr.py
 ```
 
-The script will ask for the path to your ScanR acquisition directory and then export reconstructed TIFF images.
+The script will ask for the path to your ScanR acquisition directory and where to save the images, after which it will run.
 
 ## Programmatic usage example
 
