@@ -1,12 +1,12 @@
-# ImageFormatter
+# Imageformater
 
 Python package to format high-throughput microscopy images (currently ScanR) into reconstructed multi-channel TIFF files.
 
 ## Installation
 
-### 1. Install Conda (Miniconda or Conda-Forge)
+### 1. Install Conda
 
-Use one of the official installers:
+Use one of the official installers, e.g.:
 
 - Miniconda: https://www.anaconda.com/docs/getting-started/miniconda/main
 - Conda-Forge (Miniforge): https://conda-forge.org/download/
@@ -16,8 +16,8 @@ Use one of the official installers:
 From a terminal in this project folder:
 
 ```bash
-conda create -n imageformatter python=3.11 -y
-conda activate imageformatter
+conda create -n imageformater python=3.11 -y
+conda activate imageformater
 ```
 
 ### 3. Install dependencies
@@ -38,7 +38,7 @@ pip install numpy pandas tifffile tqdm
 
 ```bash
 conda env create -f environment.yml
-conda activate imageformatter
+conda activate imageformater
 ```
 
 ## Usage
@@ -46,10 +46,10 @@ conda activate imageformatter
 ### 1. Activate the environment
 
 ```bash
-conda activate imageformatter
+conda activate imageformater
 ```
 
-### 2. Run the ScanR formatter script
+### 2. Run the ScanR formater script
 
 ```bash
 python main_scanr.py
@@ -60,9 +60,9 @@ The script will ask for the path to your ScanR acquisition directory and then ex
 ## Programmatic usage example
 
 ```python
-from HtImageFormatter import HtImageFormatter
+from HtImageformater import HtImageformater
 
-hif = HtImageFormatter()
+hif = HtImageformater()
 hif.read_ScanR(r"C:\path\to\ScanR_experiment")
 hif.export_images(channels=[2, 3])
 ```

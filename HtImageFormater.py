@@ -10,7 +10,7 @@ from tqdm.auto import tqdm
 from itertools import product
 
 
-class HtImageFormatter:
+class HtImageFormater:
     def __init__(self):
         """Initialize the HtImageFormatter class."""
         self.image_data = None
@@ -55,14 +55,32 @@ class HtImageFormatter:
         return len(self.image_data['image_id'].unique())
     
     def get_well_name(self, image_id: int):
-        """Get the well name for a given image ID."""
+        """Get the well name for a given image ID.
+        Args:
+            image_id (int): The ID of the image."""
         self.validate_image_data()
         return self.image_data[self.image_data["image_id"] == image_id]["well_names"].iloc[0]
 
     def get_site(self, image_id: int):
-        """Get the site number for a given image ID."""
+        """Get the site number for a given image ID.
+        Args:
+            image_id (int): The ID of the image."""
         self.validate_image_data()
         return self.image_data[self.image_data["image_id"] == image_id]["site"].iloc[0]
+    
+    def get_image_id(self, well_name: str, site: int):
+        """Get the image ID for a given well name and site number
+        Args:
+            well_name (str): The name of the well.
+            site (int): The site number."""
+        self.validate_image_data()
+        row = self.image_data[
+            (self.image_data["well_names"] == well_name) &
+            (self.image_data["site"] == site)
+        ]
+        if row.empty:
+            raise ValueError(f"No image found for well name '{well_name}' and site '{site}'.")
+        return row["image_id"].iloc[0]
     
     def prepare_multichannel_image(self, image_id: int = 1, channels: list = None, z_indices: list = None, times: list = None):
         """Prepare a multichannel image for a given image ID.
@@ -112,4 +130,23 @@ class HtImageFormatter:
 
         final_img = np.squeeze(final_img)  # Remove singleton dimensions if any
         
-        return [final_img, first_img.dtype]
+        return final_img
+    
+    def export_images(self, output_dir: str = None, channels: list = None, z_indices: list = None, times: list = None):
+        """Reconstruct and export all images as TIFF files in the specified output directory.
+        Args:
+            output_dir (str): Path to the directory where the TIFF files will be saved. By default, a "tiff_images" directory will be created in the data path.
+            channels (list): List of channel numbers to include in the final images. By default, all channels will be included.If 0 is included, it will place an empty image.
+            z_indices (list): List of z-index values to include in the final images. By default, all z-index values will be included.
+            times (list): List of time points to include in the final images. By default, all time points will be included."""
+        self.validate_image_data()
+        
+        if output_dir is None:
+            output_dir = os.path.join(self.data_path, "tiff_images")
+
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+        
+        for image_id in tqdm(self.image_data["image_id"].unique(), desc="Exporting images", unit="img"):
+            img = self.prepare_multichannel_image(image_id, channels=channels, z_indices=z_indices, times=times)
+            tiff.imwrite(os.path.join(output_dir, f"image_{image_id}.tif"), img, compression="lzw")

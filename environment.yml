@@ -1,4 +1,4 @@
-name: imageformatter
+name: imageformater
 channels:
   - conda-forge
 dependencies:
