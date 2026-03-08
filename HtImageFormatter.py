@@ -1,0 +1,110 @@
+"""Image formatter for high-throughput imaging.
+This module contains the HtImageFormatter class, which is designed to help read and process images from high-throughput microscopy.  
+Author: André Dias, 2026"""
+
+import os
+import pandas as pd
+import numpy as np
+import tifffile as tiff
+
+class HtImageFormatter:
+    def __init__(self):
+        """Initialize the HtImageFormatter class."""
+        self.image_data = None
+        self.data_path = None
+        self.experiment_name = None
+        self.source_microscope = None
+    
+    # --- Loading functions ---
+    def read_ScanR(self, image_dir: str):
+        """Read and process images from a ScanR acquisition.
+        Args:
+            image_dir (str): Path to the directory containing the ScanR images.
+        """
+        self.source_microscope = "ScanR"
+        self.experiment_name = image_dir.split("\\")[-1]
+        self.data_path = os.path.join(image_dir, "data")
+        self.image_data = pd.DataFrame()
+        file_list = os.listdir(self.data_path)
+        self.image_data['image_names'] = file_list
+        self.image_data['image_paths'] = [os.path.join(self.data_path, name) for name in file_list] 
+        image_info = [name.split("--") for name in file_list]
+        self.image_data['well_names'] = [elem[0] for elem in image_info]
+        self.image_data['well_numbers'] = [int(elem[1].strip('W')) for elem in image_info]
+        self.image_data['site']= [int(elem[2].strip('P')) for elem in image_info]
+        self.image_data['z-index'] = [int(elem[3].strip('Z')) for elem in image_info]
+        self.image_data['time'] = [int(elem[4].strip('T')) for elem in image_info]
+        self.image_data['channel_name'] = [elem[5].strip('.tif') for elem in image_info]
+        self.image_data.sort_values(by=['well_numbers', 'site', 'z-index', 'time', 'channel_name'], inplace=True)
+        self.image_data['channel_number'],_ = pd.factorize(self.image_data['channel_name'])
+        self.image_data['channel_number'] += 1
+        self.image_data["image_id"] = self.image_data.groupby(["well_names", "site"], sort=False).ngroup() + 1
+        self.image_data = self.image_data.reset_index(drop=True)
+        
+    def validate_image_data(self):
+        """Validate that the image data has been loaded."""
+        if self.image_data is None:
+            raise ValueError("Image data not loaded. Please load the data first.")
+    
+    def nImages(self):
+        """Return the number of unique images in the dataset."""
+        self.validate_image_data()
+        return len(self.image_data['image_id'].unique())
+    
+    def get_well_name(self, image_id: int):
+        """Get the well name for a given image ID."""
+        self.validate_image_data()
+        return self.image_data[self.image_data["image_id"] == image_id]["well_names"].iloc[0]
+
+    def get_site(self, image_id: int):
+        """Get the site number for a given image ID."""
+        self.validate_image_data()
+        return self.image_data[self.image_data["image_id"] == image_id]["site"].iloc[0]
+    
+    def prepare_multichannel_image(self, image_id: int = 1, channels: list = None, z_indices: list = None, times: list = None):
+        """Prepare a multichannel image for a given image ID.
+        Args:
+            image_id (int): The ID of the image to prepare.
+            channels (list): List of channel numbers to include in the final image. If None, all channels will be included.If 0 is included, it will place an empty image.
+            z_indices (list): List of z-index values to include in the final image. If None, all z-index values will be included.
+            times (list): List of time points to include in the final image. If None, all time points will be included."""
+        self.validate_image_data()
+
+        grp = self.image_data[self.image_data["image_id"] == image_id].copy()
+
+        if channels is None:
+            channels = grp["channel_number"].unique()
+        if z_indices is None:
+            z_indices = grp["z-index"].unique()
+        if times is None:
+            times = grp["time"].unique()
+
+        c_to_idx = {c: idx for idx, c in enumerate(channels)}
+        z_to_idx = {z: idx for idx, z in enumerate(z_indices)}
+        t_to_idx = {t: idx for idx, t in enumerate(times)}
+
+        first_img = tiff.imread(grp.iloc[0]["image_paths"])
+        y, x = first_img.shape  # image is (Y, X)
+
+        final_img = np.zeros((y, x, len(channels), len(z_indices), len(times)), dtype=first_img.dtype)
+
+        for channel in channels:
+            if channel == 0:
+                continue
+            for zstep in z_indices:
+                for time in times:
+                    row = grp[
+                        (grp["channel_number"] == channel) &
+                        (grp["z-index"] == zstep) &
+                        (grp["time"] == time)
+                    ]
+                    img = tiff.imread(row["image_paths"].values[0])  # (Y, X)
+                    final_img[:, :,
+                                c_to_idx[row["channel_number"].values[0]],
+                                z_to_idx[row["z-index"].values[0]],
+                                t_to_idx[row["time"].values[0]]
+                            ] = img
+        final_img = np.squeeze(final_img) 
+        final_img = np.squeeze(final_img)  # Remove singleton dimensions if any
+        
+        return [final_img, first_img.dtype]
