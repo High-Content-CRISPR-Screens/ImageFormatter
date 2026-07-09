@@ -5,10 +5,11 @@ Author: André Dias, 2026"""
 import os
 import pandas as pd
 import numpy as np
-import tifffile as tiff
+import tifffile as tiff 
 from tqdm.auto import tqdm
 from itertools import product
-
+import logging
+logging.getLogger("tifffile").setLevel(logging.ERROR)
 
 class HtImageFormater:
     def __init__(self):
@@ -29,6 +30,7 @@ class HtImageFormater:
         self._data_path = os.path.join(image_dir, "data")
         self._image_data = pd.DataFrame()
         file_list = os.listdir(self._data_path)
+        file_list = [img for img in file_list if img.endswith(".tif")]
         self._image_data['image_names'] = file_list
         self._image_data['image_paths'] = [os.path.join(self._data_path, name) for name in file_list] 
         image_info = [name.split("--") for name in file_list]
@@ -52,21 +54,21 @@ class HtImageFormater:
     def nImages(self):
         """Return the number of unique images in the dataset."""
         self.validate_image_data()
-        return len(self._image_data['image_id'].unique())
+        return len(self._image_data['image_id'].unique())  # type: ignore
     
     def get_well_name(self, image_id: int):
         """Get the well name for a given image ID.
         Args:
             image_id (int): The ID of the image."""
         self.validate_image_data()
-        return self._image_data[self._image_data["image_id"] == image_id]["well_names"].iloc[0]
+        return self._image_data[self._image_data["image_id"] == image_id]["well_names"].iloc[0]   # type: ignore
 
     def get_site(self, image_id: int):
         """Get the site number for a given image ID.
         Args:
             image_id (int): The ID of the image."""
         self.validate_image_data()
-        return self._image_data[self._image_data["image_id"] == image_id]["site"].iloc[0]
+        return self._image_data[self._image_data["image_id"] == image_id]["site"].iloc[0]  # type: ignore
     
     def get_image_id(self, well_name: str, site: int):
         """Get the image ID for a given well name and site number
@@ -74,15 +76,15 @@ class HtImageFormater:
             well_name (str): The name of the well.
             site (int): The site number."""
         self.validate_image_data()
-        row = self._image_data[
-            (self._image_data["well_names"] == well_name) &
-            (self._image_data["site"] == site)
+        row = self._image_data[  # type: ignore
+            (self._image_data["well_names"] == well_name) &  # type: ignore
+            (self._image_data["site"] == site)  # type: ignore
         ]
         if row.empty:
             raise ValueError(f"No image found for well name '{well_name}' and site '{site}'.")
         return row["image_id"].iloc[0]
     
-    def prepare_multichannel_image(self, image_id: int = 1, channels: list = None, z_indices: list = None, times: list = None, show_progress: bool = True):
+    def prepare_multichannel_image(self, image_id = 1, channels = None, z_indices = None, times = None, show_progress = True):
         """Prepare a multichannel image for a given image ID.
         Args:
             image_id (int): The ID of the image to prepare.
@@ -92,7 +94,7 @@ class HtImageFormater:
             show_progress (bool): If True, display a progress bar while building the image."""
         self.validate_image_data()
 
-        grp = self._image_data[self._image_data["image_id"] == image_id].copy()
+        grp = self._image_data[self._image_data["image_id"] == image_id].copy() # type: ignore
 
         if channels is None:
             channels = grp["channel_number"].unique()
@@ -106,9 +108,9 @@ class HtImageFormater:
         t_to_idx = {t: idx for idx, t in enumerate(times)}
 
         first_img = tiff.imread(grp.iloc[0]["image_paths"])
-        y, x = first_img.shape  # image is (Y, X)
+        y, x = first_img.shape  # type: ignore # image is (Y, X) 
 
-        final_img = np.zeros((y, x, len(channels), len(z_indices), len(times)), dtype=first_img.dtype)
+        final_img = np.zeros((y, x, len(channels), len(z_indices), len(times)), dtype=first_img.dtype) # type: ignore
 
         channels_nz = [c for c in channels if c != 0] # Exclude the empty channel (0) from the loop.
         total_iters = len(channels_nz) * len(z_indices) * len(times)
@@ -120,8 +122,12 @@ class HtImageFormater:
                     (grp["z-index"] == zstep) &
                     (grp["time"] == time)
                 ]
-                img = tiff.imread(row["image_paths"].values[0])  # (Y, X)
-
+                try:
+                    img = tiff.imread(row["image_paths"].values[0])  # (Y, X)
+                except Exception as e:
+                    print(f"Error reading image for combination well = {row['well_names'].values[0]}, site={row['site'].values[0]}, channel={channel}, z={zstep}, t={time}. File is likely corrupted. Skipping image. \nError: {e}")
+                    continue
+                
                 final_img[:, :,
                         c_to_idx[row["channel_number"].values[0]],
                         z_to_idx[row["z-index"].values[0]],
@@ -133,7 +139,7 @@ class HtImageFormater:
         
         return final_img
     
-    def export_images(self, output_dir: str = None, channels: list = None, z_indices: list = None, times: list = None, output_type: str = "tiff"):
+    def export_images(self, output_dir = None, channels = None, z_indices = None, times = None, output_type = "tiff"):
         """Reconstruct and export all images as TIFF files in the specified output directory.
         Args:
             output_dir (str): Path to the directory where the TIFF files will be saved. By default, a "tiff_images" directory will be created in the data path.
@@ -143,7 +149,7 @@ class HtImageFormater:
         self.validate_image_data()
         
         if output_dir is None:
-            output_dir = os.path.join(self._data_path, "tiff_images")
+            output_dir = os.path.join(self._data_path, "tiff_images") # type: ignore
 
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
@@ -153,10 +159,10 @@ class HtImageFormater:
         elif output_type == "rgb":
             photometric = 'rgb'
         
-        for image_id in tqdm(self._image_data["image_id"].unique(), desc="Exporting images", unit="img"):
+        for image_id in tqdm(self._image_data["image_id"].unique(), desc="Exporting images", unit="img"): # type: ignore
             output_name= f"image_{image_id}_{self.get_well_name(image_id)}_s{self.get_site(image_id)}.tif"
             img = self.prepare_multichannel_image(
-                image_id,
+                image_id = image_id,
                 channels=channels,
                 z_indices=z_indices,
                 times=times,
@@ -169,3 +175,4 @@ class HtImageFormater:
                 photometric=photometric,
                 planarconfig="contig"
             )
+            del img  # Free memory after saving the image
